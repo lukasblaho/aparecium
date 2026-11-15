@@ -27,7 +27,10 @@ let tocItems = [];
   const project = params.get('project');
   const repo = params.get('repo');
   const branchParam = branch ? `&version=GB${encodeURIComponent(branch)}` : '';
-  const sourceUrl = `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}?path=${encodeURIComponent(filePath)}${branchParam}`;
+  const isGitHub = isGitHubParams(params);
+  const sourceUrl = isGitHub
+    ? githubSourceUrl(params)
+    : `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}?path=${encodeURIComponent(filePath)}${branchParam}`;
   const label = prId ? `PR #${prId}` : branch ? `Branch: ${branch}` : null;
   const chipEl = document.getElementById('chip');
   if (label) { chipEl.innerHTML = (prId ? icon('git-pull-request') : '') + escapeHtml(label); chipEl.hidden = false; }
@@ -40,10 +43,11 @@ let tocItems = [];
 
   const { pat = '' } = await chrome.storage.sync.get(['pat']);
 
-  let markdown;
+  let markdown, commitId = null;
   try {
     const result = await fetchAzureFile(params, pat);
     markdown = result.text;
+    commitId = result.commitId;
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = `Failed to fetch file: ${err.message}`;
@@ -64,9 +68,12 @@ let tocItems = [];
   initLineToggle();
   initThemeToggle();
   initToc(contentEl);
+  initRepoTree(document.getElementById('repoFiles'), params, pat, filePath, commitId).then(() => {
+    if (document.getElementById('repoFiles').childElementCount) document.getElementById('toc').style.display = '';
+  });
 
-  // Commenting is only possible on PR views
-  if (prId) initComments({ org, project, repo, prId, filePath, pat, contentEl, markdown });
+  // Commenting is only possible on Azure DevOps PR views
+  if (prId && !isGitHub) initComments({ org, project, repo, prId, filePath, pat, contentEl, markdown });
 })();
 
 // ---- UI helpers ----------------------------------------------------------
@@ -134,16 +141,17 @@ function initLineToggle() {
 // "On this page" sidebar built from the rendered headings
 function initToc(contentEl) {
   const toc = document.getElementById('toc');
+  const tocHeads = document.getElementById('tocHeads');
   const heads = [...contentEl.querySelectorAll('.md-block')]
     .map(block => ({ block, h: block.querySelector('.md-body > h1, .md-body > h2, .md-body > h3, .md-body > h4') }))
     .filter(x => x.h);
   if (heads.length < 2) return;
-  toc.innerHTML = '';
+  tocHeads.innerHTML = '';
   const title = document.createElement('div');
   title.className = 'toc-title';
   title.innerHTML = '<span>ON THIS PAGE</span>' +
     '<span class="toc-ctl"><button data-act="less" title="Collapse one level">−</button><button data-act="more" title="Expand one more level">+</button></span>';
-  toc.appendChild(title);
+  tocHeads.appendChild(title);
 
   // Build the heading tree (parent = nearest previous heading with a smaller level)
   const stack = [];
@@ -174,7 +182,7 @@ function initToc(contentEl) {
     a.append(chev, t);
     a.addEventListener('click', e => { e.preventDefault(); it.block.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     it.a = a;
-    toc.appendChild(a);
+    tocHeads.appendChild(a);
   }
 
   // Header controls: collapse everything / reveal one more level at a time
@@ -920,6 +928,8 @@ function resolveRepoPath(currentFilePath, href) {
 }
 
 function rewriteLinks(container, org, project, repo, filePath, prId, branch) {
+  const ghParams = new URLSearchParams(location.search);
+  const isGitHub = isGitHubParams(ghParams);
   const RENDER_EXTS = new Set(['md', 'puml', 'plantuml', 'yaml', 'yml', 'json', 'mmd', 'mermaid']);
 
   container.querySelectorAll('a[href]').forEach(link => {
@@ -940,7 +950,17 @@ function rewriteLinks(container, org, project, repo, filePath, prId, branch) {
     const prParam = prId ? `&prId=${encodeURIComponent(prId)}` : '';
     const branchParam = (!prId && branch) ? `&branch=${encodeURIComponent(branch)}` : '';
 
-    if (RENDER_EXTS.has(ext)) {
+    if (isGitHub && RENDER_EXTS.has(ext)) {
+      const renderPage = ext === 'md' ? 'render-md.html'
+        : (ext === 'puml' || ext === 'plantuml') ? 'render-puml.html'
+        : (ext === 'mmd' || ext === 'mermaid') ? 'render-mermaid.html'
+        : 'render-openapi.html';
+      link.href = chrome.runtime.getURL(renderPage) + githubRenderQuery(ghParams, resolvedPath) + fragment;
+      link.target = '_self';
+    } else if (isGitHub) {
+      link.href = githubSourceUrl(ghParams, resolvedPath) + fragment;
+      link.target = '_self';
+    } else if (RENDER_EXTS.has(ext)) {
       // Link to another renderable file → open in same tab (back button works)
       const renderPage = ext === 'md' ? 'render-md.html'
         : (ext === 'puml' || ext === 'plantuml') ? 'render-puml.html'

@@ -6,6 +6,28 @@ const domainsInput = document.getElementById('domainsInput');
 const saveDomainsBtn = document.getElementById('saveDomainsBtn');
 const domainsStatus = document.getElementById('domainsStatus');
 
+const ghTokenInput = document.getElementById('ghTokenInput');
+const saveGhBtn = document.getElementById('saveGhBtn');
+const ghStatus = document.getElementById('ghStatus');
+const showGhToken = document.getElementById('showGhToken');
+
+chrome.storage.sync.get(['ghToken'], ({ ghToken = '' }) => {
+  ghTokenInput.value = ghToken;
+});
+
+showGhToken.addEventListener('click', () => {
+  const hidden = ghTokenInput.type === 'password';
+  ghTokenInput.type = hidden ? 'text' : 'password';
+  showGhToken.textContent = hidden ? 'Hide' : 'Show';
+});
+
+saveGhBtn.addEventListener('click', () => {
+  chrome.storage.sync.set({ ghToken: ghTokenInput.value.trim() }, () => {
+    ghStatus.textContent = '✓ Saved';
+    setTimeout(() => { ghStatus.textContent = ''; }, 2000);
+  });
+});
+
 // Load saved settings
 chrome.storage.sync.get(['pat', 'graphqlAllowedDomains'], ({ pat = '', graphqlAllowedDomains = [] }) => {
   patInput.value = pat;

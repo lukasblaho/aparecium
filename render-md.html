@@ -78,6 +78,20 @@
     #toc a.expanded .chev .ic { transform: rotate(90deg); }
     #toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
     #toc a span.t { flex: 1; min-width: 0; }
+    #tocHeads { display: flex; flex-direction: column; gap: 2px; }
+    #repoFiles.rt { margin-top: 24px; display: flex; flex-direction: column; gap: 2px; }
+    #tocHeads:empty + #repoFiles.rt { margin-top: 0; }
+    .rt-filter { margin: 0 0 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12.5px; }
+    .rt-filter:focus { outline: 2px solid var(--sel); border-color: var(--accent); }
+    .rt-list { display: flex; flex-direction: column; gap: 1px; }
+    #toc .rt-list a { padding-top: 4px; padding-bottom: 4px; gap: 6px; font-size: 13px; }
+    #toc .rt-list a .ic { flex: none; width: 14px; height: 14px; }
+    #toc .rt-list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #toc .rt-chev { flex: none; width: 14px; height: 14px; color: var(--ink3); }
+    #toc .rt-dir .rt-chev .ic { transition: transform .12s; }
+    #toc .rt-dir.expanded .rt-chev .ic { transform: rotate(90deg); }
+    #toc .rt-dir { color: var(--ink); }
+    .rt-note { padding: 4px 4px; font-size: 12px; color: var(--ink3); }
     #toc .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--amber-soft); color: var(--amber-ink); font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center; }
     #content { flex: 1; min-width: 0; padding: 40px 0 72px; }
     #source { display: none; max-width: 860px; margin: 40px auto; padding: 20px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; font: 13.5px/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; }
@@ -233,7 +247,7 @@
   </div>
   <div id="status">Fetching file…</div>
   <div id="page">
-    <nav id="toc" style="display:none"></nav>
+    <nav id="toc" style="display:none"><div id="tocHeads"></div><div id="repoFiles"></div></nav>
     <div id="content" style="display:none"></div>
   </div>
   <pre id="source"></pre>
@@ -241,7 +255,9 @@
   <script src="lib/marked.min.js"></script>
   <script src="lib/pako.min.js"></script>
   <script src="lib/mermaid.min.js"></script>
+  <script src="github-fetch.js"></script>
   <script src="azure-fetch.js"></script>
+  <script src="repo-tree.js"></script>
   <script src="azure-comments.js"></script>
   <script src="render-md.js"></script>
 </body>

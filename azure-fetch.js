@@ -3,6 +3,9 @@
 // in the calling script's scope.
 
 async function fetchAzureFile(params, pat) {
+  // GitHub files go through github-fetch.js (it reads its own token).
+  if (typeof isGitHubParams === 'function' && isGitHubParams(params)) return fetchGitHubFile(params);
+
   const org = params.get('org');
   const project = params.get('project');
   const repo = params.get('repo');

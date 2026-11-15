@@ -1,5 +1,5 @@
 // Content script: detects .md, .puml, .yaml/.yml/.json, and .mmd file views
-// on dev.azure.com and shows a floating icon in the bottom-right corner.
+// on dev.azure.com and github.com and shows a floating icon in the bottom-right corner.
 // The icon's color/glyph reflects the doc type, and for diagrams
 // (Mermaid/PlantUML) the file content is sniffed to further show the
 // specific diagram kind (sequence, class, component, ...). Clicking the
@@ -239,6 +239,13 @@ function looksLikeGraphQLSDLText(text) {
 async function handleFileViewInner() {
   if (!isExtensionContextValid()) return;
 
+  // GitHub re-renders its DOM after navigation, so it is re-checked on
+  // mutations too (handleGitHubPage is idempotent) rather than once per URL.
+  if (window.location.hostname === 'github.com') {
+    await handleGitHubPage();
+    return;
+  }
+
   const url = window.location.href;
   if (url === lastUrl) return;
   lastUrl = url;
@@ -255,11 +262,8 @@ async function handleFileViewInner() {
     return;
   }
 
-  const ext = filePath.split('.').pop().toLowerCase();
-  if (ext !== 'md' && ext !== 'puml' && ext !== 'plantuml' &&
-      ext !== 'yaml' && ext !== 'yml' && ext !== 'json' &&
-      ext !== 'mmd' && ext !== 'mermaid' &&
-      ext !== 'graphql' && ext !== 'gql') {
+  const kind = EXT_KIND[filePath.split('.').pop().toLowerCase()];
+  if (!kind) {
     hideIcon();
     return;
   }
@@ -281,18 +285,8 @@ async function handleFileViewInner() {
   const repo = decodeURIComponent(match[3]);
   const prId = match[4] || null; // present only on PR pages
 
-  const kind = ext === 'md' ? 'markdown'
-    : (ext === 'puml' || ext === 'plantuml') ? 'plantuml'
-    : (ext === 'mmd' || ext === 'mermaid') ? 'mermaid'
-    : (ext === 'graphql' || ext === 'gql') ? 'graphql'
-    : 'openapi';
-  const renderPage = kind === 'markdown' ? 'render-md.html'
-    : kind === 'plantuml' ? 'render-puml.html'
-    : kind === 'mermaid' ? 'render-mermaid.html'
-    : kind === 'graphql' ? 'render-graphql.html'
-    : 'render-openapi.html';
   let renderUrl =
-    chrome.runtime.getURL(renderPage) +
+    chrome.runtime.getURL(KIND_PAGE[kind]) +
     `?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}` +
     `&repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(filePath)}`;
 
@@ -316,6 +310,159 @@ async function handleFileViewInner() {
     const myToken = ++detectToken;
     const text = await fetchFileTextForSniffing(org, project, repo, filePath, prId, branch);
     if (myToken !== detectToken || !text) return; // stale or unavailable
+    const subtype = kind === 'mermaid' ? detectMermaidSubtype(text) : detectPlantUMLSubtype(text);
+    if (subtype) paintIcon(kind, subtype);
+  }
+}
+
+// --- File type → doc kind / render page ---
+const EXT_KIND = {
+  md: 'markdown', puml: 'plantuml', plantuml: 'plantuml', mmd: 'mermaid', mermaid: 'mermaid',
+  graphql: 'graphql', gql: 'graphql', yaml: 'openapi', yml: 'openapi', json: 'openapi',
+};
+const KIND_PAGE = {
+  markdown: 'render-md.html', plantuml: 'render-puml.html', mermaid: 'render-mermaid.html',
+  graphql: 'render-graphql.html', openapi: 'render-openapi.html',
+};
+
+// --- GitHub ---
+const GH_BLOB_RE = /^\/([^/]+)\/([^/]+)\/blob\/(.+)$/;
+const GH_PR_RE = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)\/(?:files|changes)(?:\/|$)/;
+
+function githubRenderUrl(kind, owner, repo, path, { prId, ref }) {
+  let url = chrome.runtime.getURL(KIND_PAGE[kind]) +
+    `?provider=github&org=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}` +
+    `&path=${encodeURIComponent(path)}`;
+  if (prId) url += `&prId=${encodeURIComponent(prId)}`;
+  else if (ref) url += `&branch=${encodeURIComponent(ref)}`;
+  return url;
+}
+
+// Branch names may contain slashes, so /blob/<ref>/<path> is ambiguous from
+// the URL alone. Ask the page which ref is selected; fall back to the first
+// segment. `rest` is the decoded text after "/blob/".
+function detectGitHubRef(rest) {
+  const candidates = [];
+  try {
+    const data = document.querySelector('react-app script[data-target="react-app.embeddedData"]');
+    if (data) candidates.push(JSON.parse(data.textContent)?.payload?.refInfo?.name);
+  } catch {
+    // Page structure changed — fall through to the other strategies
+  }
+  candidates.push(document.querySelector('[data-hotkey="w"] .css-truncate-target, #ref-picker-repos-header-ref-selector')?.textContent?.trim());
+  for (const c of candidates) {
+    if (c && rest.startsWith(`${c}/`)) return c;
+  }
+  return rest.split('/')[0];
+}
+
+// Native "Aparecium" button styled like GitHub's own small buttons.
+function makeGitHubButton(renderUrl, kind) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-sm aparecium-gh-btn';
+  btn.dataset.apareciumUrl = renderUrl;
+  btn.title = `View rendered ${(KIND_STYLES[kind] || KIND_STYLES.markdown).label} in Aparecium`;
+  btn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin-right:8px;';
+  const img = document.createElement('img');
+  img.src = chrome.runtime.getURL('icons/icon48.png');
+  img.width = 16;
+  img.height = 16;
+  img.style.borderRadius = '4px';
+  btn.append(img, document.createTextNode('Aparecium'));
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      chrome.runtime.sendMessage({ action: 'openTab', url: renderUrl });
+    } catch {
+      // Extension context invalidated — nothing to do
+    }
+  });
+  return btn;
+}
+
+// Puts the button next to the Raw/Copy/Blame group in a file view's toolbar.
+function injectBlobToolbarButton(renderUrl, kind) {
+  document.querySelectorAll('.aparecium-gh-btn').forEach(b => {
+    if (b.dataset.apareciumUrl !== renderUrl) b.remove();
+  });
+  if (document.querySelector('.aparecium-gh-btn')) return;
+  const raw = document.querySelector('[data-testid="raw-button"], a#raw-url');
+  if (!raw) return;
+  const group = raw.closest('.BtnGroup, [data-component="ButtonGroup"], [class*="ButtonGroup"]') || raw;
+  group.parentElement?.insertBefore(makeGitHubButton(renderUrl, kind), group);
+}
+
+// Pull request "Files changed": one button per renderable file header.
+function injectPrFileButtons(owner, repo, prId) {
+  const headers = new Set(document.querySelectorAll('.file-header[data-path]'));
+  // Newer diff UI: the file path is the title of a link inside the header.
+  document.querySelectorAll('[class*="diffHeader"] a[title], [class*="DiffFileHeader"] a[title]').forEach(a => {
+    const h = a.closest('[class*="diffHeader"], [class*="DiffFileHeader"]');
+    if (h) headers.add(h);
+  });
+
+  headers.forEach(header => {
+    if (header.querySelector('.aparecium-gh-btn')) return;
+    const raw = header.dataset.path || header.querySelector('a[title]')?.getAttribute('title') || '';
+    // Renames read "old → new"; strip GitHub's invisible direction marks.
+    const path = raw.replace(/[‎‏]/g, '').split(/\s+→\s+/).pop().trim();
+    const kind = EXT_KIND[path.split('.').pop().toLowerCase()];
+    if (!path || !kind) return;
+    const btn = makeGitHubButton(githubRenderUrl(kind, owner, repo, path, { prId }), kind);
+    btn.style.marginRight = '4px';
+    const actions = header.querySelector('.file-actions');
+    if (actions) actions.prepend(btn);
+    else header.appendChild(btn);
+  });
+}
+
+async function handleGitHubPage() {
+  const path = window.location.pathname;
+
+  const pr = GH_PR_RE.exec(path);
+  if (pr) {
+    hideIcon();
+    injectPrFileButtons(decodeURIComponent(pr[1]), decodeURIComponent(pr[2]), pr[3]);
+    return;
+  }
+
+  const blob = GH_BLOB_RE.exec(path);
+  const ext = blob ? decodeURIComponent(blob[3]).split('?')[0].split('.').pop().toLowerCase() : '';
+  const kind = EXT_KIND[ext];
+  if (!blob || !kind) {
+    hideIcon();
+    return;
+  }
+
+  const owner = decodeURIComponent(blob[1]);
+  const repo = decodeURIComponent(blob[2]);
+  const rest = decodeURIComponent(blob[3]);
+  const ref = detectGitHubRef(rest);
+  const filePath = rest.slice(ref.length + 1);
+  if (!filePath) {
+    hideIcon();
+    return;
+  }
+
+  const renderUrl = githubRenderUrl(kind, owner, repo, filePath, { ref });
+  injectBlobToolbarButton(renderUrl, kind);
+  if (renderUrl === currentRenderUrl) return; // already showing for this file
+
+  showIcon(renderUrl, kind, null);
+
+  if (kind === 'mermaid' || kind === 'plantuml') {
+    const myToken = ++detectToken;
+    let text = null;
+    try {
+      text = (await fetchGitHubFile(new URLSearchParams({
+        provider: 'github', org: owner, repo, path: filePath, branch: ref,
+      }))).text;
+    } catch {
+      // Best-effort only — the icon works without a subtype
+    }
+    if (myToken !== detectToken || !text) return;
     const subtype = kind === 'mermaid' ? detectMermaidSubtype(text) : detectPlantUMLSubtype(text);
     if (subtype) paintIcon(kind, subtype);
   }
@@ -411,6 +558,15 @@ function scheduleHandleFileView() {
   debounceTimer = setTimeout(handleFileView, 300);
 }
 
+// GitHub swaps page chunks in place (Turbo/React) and lazily renders diff
+// headers, so re-check on DOM changes. Throttled, not debounced, because
+// the page may never go quiet.
+let ghThrottle = null;
+function scheduleGitHubRefresh() {
+  if (ghThrottle) return;
+  ghThrottle = setTimeout(() => { ghThrottle = null; handleFileView(); }, 400);
+}
+
 // Patch history API to catch pushState / replaceState URL changes directly,
 // which is more reliable than waiting for DOM mutations.
 const _pushState = history.pushState.bind(history);
@@ -420,6 +576,11 @@ history.replaceState = function (...args) { _replaceState(...args); scheduleHand
 
 // MutationObserver as a fallback for navigations that bypass history API.
 const navObserver = new MutationObserver(() => {
+  if (location.hostname === 'github.com') {
+    // handleFileView's lastUrl guard is bypassed for GitHub (see above)
+    scheduleGitHubRefresh();
+    return;
+  }
   if (location.href !== (navObserver._lastUrl ?? '')) {
     navObserver._lastUrl = location.href;
     scheduleHandleFileView();

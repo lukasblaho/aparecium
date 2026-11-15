@@ -1,6 +1,6 @@
 # Aparecium
 
-A Chrome extension that renders **Markdown**, **PlantUML**, **OpenAPI**, and **GraphQL schema** files directly in the browser when viewing them in Azure DevOps (dev.azure.com) — and, for GraphQL schemas, also on raw files served by any site.
+A Chrome extension that renders **Markdown**, **PlantUML**, **OpenAPI**, and **GraphQL schema** files directly in the browser when viewing them in Azure DevOps (dev.azure.com) or GitHub (github.com) — and, for GraphQL schemas, also on raw files served by any site.
 
 On open Pull Requests you can also add, read, reply to and resolve review comments right from the rendered Markdown.
 
@@ -69,6 +69,8 @@ list.
 1. Browse to any `.md`, `.puml`, `.yaml`/`.yml`, `.json`, `.mmd`/`.mermaid`, or `.graphql`/`.gql` file in Azure DevOps — or a raw `.graphql`/`.gql` schema file served by any site
 2. A small floating icon appears in the bottom-right corner of the page, colored/shaped according to the doc type, indicating the file was recognized
 3. Click the icon to open the rendered content in a new tab
+
+**GitHub:** on a file page (`/blob/…`) you get the floating icon plus an *Aparecium* button next to Raw/Copy/Blame. On a pull request's *Files changed* tab each renderable file header gets an *Aparecium* button that renders the PR head version. Public repos work out of the box; for private repos (and to avoid API rate limits on PRs) add a GitHub token in the extension popup (classic `repo` scope, or fine-grained *Contents: Read* + *Pull requests: Read*). PR commenting is Azure DevOps only.
 
 For Mermaid and PlantUML files, the extension briefly inspects the file content to detect the specific diagram kind (e.g. Sequence, Class, Component, State) and shows it in the icon's tooltip.
 
