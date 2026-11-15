@@ -14,7 +14,7 @@
   const project = params.get('project');
   const repo = params.get('repo');
   const branchParam = branch ? `&version=GB${encodeURIComponent(branch)}` : '';
-  const sourceUrl =
+  const sourceUrl = isGitHubParams(params) ? githubSourceUrl(params) :
     `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}` +
     `/_git/${encodeURIComponent(repo)}?path=${encodeURIComponent(filePath)}${branchParam}`;
 

@@ -2,13 +2,13 @@
   "manifest_version": 3,
   "name": "Aparecium",
   "version": "1.0.0",
-  "description": "Shows an icon over Markdown/PlantUML/GraphQL/diagram files in Azure DevOps and raw web pages, and renders them in a new tab on click. On open Pull Requests, add and manage review comments.",
+  "description": "Cast Aparecium on raw text files: Markdown, PlantUML, Mermaid, OpenAPI and GraphQL appear as beautifully rendered pages.",
   "permissions": ["storage", "tabs"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["github-fetch.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
@@ -31,7 +31,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["render-md.html", "render-puml.html", "render-openapi.html", "render-mermaid.html", "render-graphql.html", "lib/marked.min.js", "lib/pako.min.js", "lib/js-yaml.min.js", "lib/swagger-ui-bundle.js", "lib/swagger-ui.css", "lib/swagger-ui-theme-flattop.css", "lib/mermaid.min.js", "azure-fetch.js", "azure-comments.js", "theme-init.js", "shell.css", "shell.js", "icons/icon48.png"],
+      "resources": ["render-md.html", "render-puml.html", "render-openapi.html", "render-mermaid.html", "render-graphql.html", "lib/marked.min.js", "lib/pako.min.js", "lib/js-yaml.min.js", "lib/swagger-ui-bundle.js", "lib/swagger-ui.css", "lib/swagger-ui-theme-flattop.css", "lib/mermaid.min.js", "github-fetch.js", "azure-fetch.js", "azure-comments.js", "theme-init.js", "shell.css", "shell.js", "icons/icon48.png"],
       "matches": ["<all_urls>"]
     }
   ],

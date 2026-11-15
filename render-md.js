@@ -27,7 +27,10 @@ let tocItems = [];
   const project = params.get('project');
   const repo = params.get('repo');
   const branchParam = branch ? `&version=GB${encodeURIComponent(branch)}` : '';
-  const sourceUrl = `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}?path=${encodeURIComponent(filePath)}${branchParam}`;
+  const isGitHub = isGitHubParams(params);
+  const sourceUrl = isGitHub
+    ? githubSourceUrl(params)
+    : `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}?path=${encodeURIComponent(filePath)}${branchParam}`;
   const label = prId ? `PR #${prId}` : branch ? `Branch: ${branch}` : null;
   const chipEl = document.getElementById('chip');
   if (label) { chipEl.innerHTML = (prId ? icon('git-pull-request') : '') + escapeHtml(label); chipEl.hidden = false; }
@@ -65,8 +68,8 @@ let tocItems = [];
   initThemeToggle();
   initToc(contentEl);
 
-  // Commenting is only possible on PR views
-  if (prId) initComments({ org, project, repo, prId, filePath, pat, contentEl, markdown });
+  // Commenting is only possible on Azure DevOps PR views
+  if (prId && !isGitHub) initComments({ org, project, repo, prId, filePath, pat, contentEl, markdown });
 })();
 
 // ---- UI helpers ----------------------------------------------------------
@@ -920,6 +923,8 @@ function resolveRepoPath(currentFilePath, href) {
 }
 
 function rewriteLinks(container, org, project, repo, filePath, prId, branch) {
+  const ghParams = new URLSearchParams(location.search);
+  const isGitHub = isGitHubParams(ghParams);
   const RENDER_EXTS = new Set(['md', 'puml', 'plantuml', 'yaml', 'yml', 'json', 'mmd', 'mermaid']);
 
   container.querySelectorAll('a[href]').forEach(link => {
@@ -940,7 +945,17 @@ function rewriteLinks(container, org, project, repo, filePath, prId, branch) {
     const prParam = prId ? `&prId=${encodeURIComponent(prId)}` : '';
     const branchParam = (!prId && branch) ? `&branch=${encodeURIComponent(branch)}` : '';
 
-    if (RENDER_EXTS.has(ext)) {
+    if (isGitHub && RENDER_EXTS.has(ext)) {
+      const renderPage = ext === 'md' ? 'render-md.html'
+        : (ext === 'puml' || ext === 'plantuml') ? 'render-puml.html'
+        : (ext === 'mmd' || ext === 'mermaid') ? 'render-mermaid.html'
+        : 'render-openapi.html';
+      link.href = chrome.runtime.getURL(renderPage) + githubRenderQuery(ghParams, resolvedPath) + fragment;
+      link.target = '_self';
+    } else if (isGitHub) {
+      link.href = githubSourceUrl(ghParams, resolvedPath) + fragment;
+      link.target = '_self';
+    } else if (RENDER_EXTS.has(ext)) {
       // Link to another renderable file → open in same tab (back button works)
       const renderPage = ext === 'md' ? 'render-md.html'
         : (ext === 'puml' || ext === 'plantuml') ? 'render-puml.html'

@@ -15,6 +15,10 @@
     // Generic raw-file mode: `src` is the absolute URL of the raw schema file.
     sourceUrl = src;
     displayName = decodeURIComponent(src);
+  } else if (isGitHubParams(params)) {
+    sourceUrl = githubSourceUrl(params);
+    const label = params.get('prId') ? `PR #${params.get('prId')}` : params.get('branch') ? `Branch: ${params.get('branch')}` : null;
+    displayName = (label ? `${label} — ` : '') + filePath;
   } else {
     // Azure DevOps mode: same org/project/repo/path/[prId]/[branch] contract
     // used by the other render-*.js pages.
