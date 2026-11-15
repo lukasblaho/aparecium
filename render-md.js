@@ -43,10 +43,11 @@ let tocItems = [];
 
   const { pat = '' } = await chrome.storage.sync.get(['pat']);
 
-  let markdown;
+  let markdown, commitId = null;
   try {
     const result = await fetchAzureFile(params, pat);
     markdown = result.text;
+    commitId = result.commitId;
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = `Failed to fetch file: ${err.message}`;
@@ -67,6 +68,9 @@ let tocItems = [];
   initLineToggle();
   initThemeToggle();
   initToc(contentEl);
+  initRepoTree(document.getElementById('repoFiles'), params, pat, filePath, commitId).then(() => {
+    if (document.getElementById('repoFiles').childElementCount) document.getElementById('toc').style.display = '';
+  });
 
   // Commenting is only possible on Azure DevOps PR views
   if (prId && !isGitHub) initComments({ org, project, repo, prId, filePath, pat, contentEl, markdown });
@@ -137,16 +141,17 @@ function initLineToggle() {
 // "On this page" sidebar built from the rendered headings
 function initToc(contentEl) {
   const toc = document.getElementById('toc');
+  const tocHeads = document.getElementById('tocHeads');
   const heads = [...contentEl.querySelectorAll('.md-block')]
     .map(block => ({ block, h: block.querySelector('.md-body > h1, .md-body > h2, .md-body > h3, .md-body > h4') }))
     .filter(x => x.h);
   if (heads.length < 2) return;
-  toc.innerHTML = '';
+  tocHeads.innerHTML = '';
   const title = document.createElement('div');
   title.className = 'toc-title';
   title.innerHTML = '<span>ON THIS PAGE</span>' +
     '<span class="toc-ctl"><button data-act="less" title="Collapse one level">−</button><button data-act="more" title="Expand one more level">+</button></span>';
-  toc.appendChild(title);
+  tocHeads.appendChild(title);
 
   // Build the heading tree (parent = nearest previous heading with a smaller level)
   const stack = [];
@@ -177,7 +182,7 @@ function initToc(contentEl) {
     a.append(chev, t);
     a.addEventListener('click', e => { e.preventDefault(); it.block.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     it.a = a;
-    toc.appendChild(a);
+    tocHeads.appendChild(a);
   }
 
   // Header controls: collapse everything / reveal one more level at a time
