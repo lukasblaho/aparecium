@@ -15,6 +15,8 @@ On open Pull Requests you can also add, read, reply to and resolve review commen
 - 🔍 Zoom in/out on diagrams (buttons or `Ctrl/Cmd + scroll`)
 - 💬 **Manage comments on open Pull Requests** directly from the rendered view: hover a block of rendered Markdown and click **+** to comment on the matching source lines, and see existing PR threads inline with reply and resolve/reopen (block-level anchoring; needs a PAT with Code read & write)
 - 🔀 Works on regular file views **and** Pull Request file views
+- 🐙 Also works on GitHub: file pages (`/blob/…`) and the *Files changed* tab of pull requests
+- 🗂️ Markdown viewer shows a table of contents with a collapsible, filterable tree of the repo's renderable files underneath
 - 🔒 Supports private repositories via a Personal Access Token (PAT)
 - 🔵 Shows a small floating icon over recognized documents — click it to open the rendered view in a new tab (nothing opens automatically)
 - 🎨 The icon is a gradient chip (with the Aparecium badge in its corner) whose color/glyph reflects the doc type (Markdown, PlantUML, Mermaid, OpenAPI, GraphQL), and for diagrams it shows the detected kind (Sequence, Class, Component, State, ...) in the tooltip when it can be determined from the file content
@@ -27,7 +29,7 @@ On open Pull Requests you can also add, read, reply to and resolve review commen
 
 **Option A — Clone with Git:**
 ```bash
-git clone https://github.com/lukasblaho/ado-docs-viewer.git
+git clone https://github.com/lukasblaho/aparecium.git
 ```
 
 **Option B — Download ZIP:**
@@ -40,14 +42,14 @@ git clone https://github.com/lukasblaho/ado-docs-viewer.git
 1. Open Chrome and navigate to `chrome://extensions`
 2. Enable **Developer mode** (toggle in the top-right corner)
 3. Click **Load unpacked**
-4. Select the `ado-docs-viewer` folder (the one containing `manifest.json`)
+4. Select the `aparecium` folder (the one containing `manifest.json`)
 
 The Aparecium icon (a glowing magic wand) will appear in your toolbar.
 
-### 3. Configure your PAT (for private repositories)
+### 3. Configure your token (for private repositories)
 
 1. Click the extension icon in the toolbar
-2. Paste your Azure DevOps **Personal Access Token**
+2. Paste your Azure DevOps **Personal Access Token** (and/or a GitHub token, see [Usage](#usage))
 3. Click **Save**
 
 To create a PAT in Azure DevOps:
@@ -99,7 +101,7 @@ GraphQL Voyager needs to spin up a Web Worker (for its graph-layout engine) usin
 Since this is loaded as an unpacked extension, updates are not automatic.
 
 ```bash
-cd ado-docs-viewer
+cd aparecium
 git pull
 ```
 
